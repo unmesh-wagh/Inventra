@@ -74,29 +74,24 @@
       --shadow-md:0 6px 18px rgba(0,0,0,0.45), 0 2px 5px rgba(0,0,0,0.3);
     }
 
-    #logoutBtn {
-      position: fixed;
-      top: 18px;
-      right: 75px;
-      z-index: 1000;
-
-      padding: 8px 16px;
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 8px;
-
-      background: transparent;
-      color: #ffffff;
-
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-
-      transition: all 0.2s ease;
+    .topbar-actions { display: flex; align-items: center; gap: 8px; }
+    .avatar-btn {
+      width: 32px; height: 32px; border-radius: 50%; padding: 0; flex-shrink: 0; cursor: pointer;
+      border: 1.5px solid rgba(255,255,255,0.25); background: var(--teal-bg); color: var(--teal-deep);
+      display: flex; align-items: center; justify-content: center; overflow: hidden;
+      font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 13px;
     }
-
-    #logoutBtn:hover {
-      background: rgba(255, 255, 255, 0.1);
+    .avatar-btn img { width: 100%; height: 100%; object-fit: cover; }
+    .avatar-lg {
+      width: 52px; height: 52px; border-radius: 50%; flex-shrink: 0; overflow: hidden;
+      background: var(--teal-bg); color: var(--teal-deep);
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 20px;
     }
+    .avatar-lg img { width: 100%; height: 100%; object-fit: cover; }
+    .account-row { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+    .account-name { font-weight: 600; font-size: 14.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .account-type { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
 
     * {
       box-sizing: border-box;
@@ -984,7 +979,9 @@
         <div class="brand-sub" id="headerSub">Loading your data…</div>
       </div>
     </div>
-    <button class="icon-btn" id="settingsToggle" aria-label="Settings">
+    <div class="topbar-actions">
+      <button class="avatar-btn" id="accountAvatarBtn" aria-label="Account"></button>
+      <button class="icon-btn" id="settingsToggle" aria-label="Settings">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
         stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="3"></circle>
@@ -993,10 +990,26 @@
         </path>
       </svg>
     </button>
+    </div>
   </div>
 
   <div class="settings-panel" id="settingsPanel">
     <div class="container">
+      <div class="card">
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+            stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>Account</h3>
+        <div class="account-row">
+          <div class="avatar-lg" id="accountAvatarLarge"></div>
+          <div>
+            <div class="account-name" id="accountName">Loading…</div>
+            <div class="account-type" id="accountType"></div>
+          </div>
+        </div>
+        <button class="btn btn-outline" id="logoutBtn">Sign out</button>
+      </div>
       <div class="card">
         <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
             stroke-linejoin="round">
@@ -1226,11 +1239,6 @@
   </div>
 
   <div class="toast" id="toast"></div>
-
-  <!-- your existing HTML above -->
-
-  <button id="logoutBtn">Logout</button>
-
 
   <script type="module">
 
@@ -1616,21 +1624,61 @@
       if (window.__inventraBoot) window.__inventraBoot();
     }
 
+    /* Shows who's currently signed in: their Google photo if there is one,
+       otherwise an initial/guest icon, in both the topbar and Settings. */
+    function guestIconSvg() {
+      return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>';
+    }
+    function updateAccountUI(user) {
+      var avatarTop = document.getElementById('accountAvatarBtn');
+      var avatarBig = document.getElementById('accountAvatarLarge');
+      var nameEl = document.getElementById('accountName');
+      var typeEl = document.getElementById('accountType');
+      if (!user) {
+        [avatarTop, avatarBig].forEach(function (el) { if (el) el.innerHTML = ''; });
+        if (nameEl) nameEl.textContent = 'Not signed in';
+        if (typeEl) typeEl.textContent = '';
+        return;
+      }
+      var isAnon = user.isAnonymous;
+      var photo = user.photoURL;
+      var label = isAnon ? 'Guest' : (user.displayName || user.email || 'Account');
+      var initial = (label || '?').trim().charAt(0).toUpperCase() || '?';
+
+      [avatarTop, avatarBig].forEach(function (el) {
+        if (!el) return;
+        if (photo) {
+          el.innerHTML = '<img src="' + photo + '" alt="' + label.replace(/"/g, '') + '">';
+        } else if (isAnon) {
+          el.innerHTML = guestIconSvg();
+        } else {
+          el.textContent = initial;
+        }
+      });
+      if (nameEl) nameEl.textContent = isAnon ? 'Guest' : (user.displayName || user.email || 'Signed in');
+      if (typeEl) typeEl.textContent = isAnon
+        ? 'Guest account \u2014 data stays on this device'
+        : (user.email ? user.email + ' \u00b7 synced across devices' : 'Synced across devices');
+    }
+
     onAuthStateChanged(auth, function (user) {
 
       if (user) {
         console.log("Inventra user signed in:", user.uid);
         window.storage = buildFirestoreBackend(user.uid);
         authScreen.classList.add("hidden");
+        updateAccountUI(user);
         __inventraBootOnce();
 
       } else {
         console.log("No Inventra user signed in.");
 
         authScreen.classList.remove("hidden");
+        updateAccountUI(null);
       }
 
     });
+
 
     /* Safety net: if Firebase can't reach the network (offline, ad-blocker,
        corporate proxy, etc.) don't leave the person stuck on the sign-in
@@ -2228,6 +2276,8 @@
         settingsPanel.classList.toggle('show', settingsOpen);
         mainViews.style.display = settingsOpen ? 'none' : '';
       });
+      var accountAvatarBtn = document.getElementById('accountAvatarBtn');
+      if (accountAvatarBtn) accountAvatarBtn.addEventListener('click', function () { settingsToggle.click(); });
 
       /* ---------------- theme ---------------- */
       var themeToggle = document.getElementById('themeToggle');
