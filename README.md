@@ -1,6 +1,10 @@
 # Inventra
 
+<<<<<<< HEAD
 A mobile-first inventory manager for small shops — track stock, keep customer credit tabs, see your profit day by day and week by week, and sign in to keep it all synced across your devices.
+=======
+A single-file, mobile-first inventory manager for small shops : track stock, keep customer credit tabs, and see your profit day by day and week by week. No install, no backend, no build step.
+>>>>>>> 6cc51fb8bdff874aeaed21f6dd9a7ad1372582aa
 
 <!-- Optional: add a screenshot once you have one
 ![Inventra screenshot](screenshot.png)
@@ -18,7 +22,7 @@ A mobile-first inventory manager for small shops — track stock, keep customer 
 
 **Inventory**
 - Add products with quantity, sale price, and profit margin (₹)
-- Product-name autocomplete, learned from everything you've ever typed — even after a product is removed
+- Product-name autocomplete, learned from everything you've ever typed even after a product is removed
 - Stock correction controls (+ / − / tap-to-edit exact quantity) for restocks and fixes
 - A dedicated **Sell** action that reduces stock *and* logs profit, kept separate from manual corrections
 - Low-stock indicator and live totals (product count, total units, low-stock count)
@@ -41,6 +45,10 @@ A mobile-first inventory manager for small shops — track stock, keep customer 
 - Light and dark mode, toggled from Settings → Appearance, remembered on your next visit
 
 **Data & portability**
+<<<<<<< HEAD
+=======
+- All data persists automatically between visits, no login, no account
+>>>>>>> 6cc51fb8bdff874aeaed21f6dd9a7ad1372582aa
 - Export everything to a single `.json` backup file
 - Import a backup to restore data or move it into a different account
 - Works signed-in (cloud sync via Firebase) or signed-out (local-only, this device)
