@@ -1,6 +1,6 @@
 # Inventra
 
-A single-file, mobile-first inventory manager for small shops — track stock, keep customer credit tabs, and see your profit day by day and week by week. No install, no backend, no build step.
+A single-file, mobile-first inventory manager for small shops : track stock, keep customer credit tabs, and see your profit day by day and week by week. No install, no backend, no build step.
 
 <!-- Optional: add a screenshot once you have one
 ![Inventra screenshot](screenshot.png)
@@ -10,7 +10,7 @@ A single-file, mobile-first inventory manager for small shops — track stock, k
 
 **Inventory**
 - Add products with quantity, sale price, and profit margin (₹)
-- Product-name autocomplete, learned from everything you've ever typed — even after a product is removed
+- Product-name autocomplete, learned from everything you've ever typed even after a product is removed
 - Stock correction controls (+ / − / tap-to-edit exact quantity) for restocks and fixes
 - A dedicated **Sell** action that reduces stock *and* logs profit, kept separate from manual corrections
 - Low-stock indicator and live totals (product count, total units, low-stock count)
@@ -30,7 +30,7 @@ A single-file, mobile-first inventory manager for small shops — track stock, k
 - Full weekly history list, most recent first
 
 **Data & portability**
-- All data persists automatically between visits — no login, no account
+- All data persists automatically between visits, no login, no account
 - Export everything to a single `.json` backup file
 - Import a backup to restore data or move it to another device
 - Works standalone once deployed (see [Storage](#storage) below)
