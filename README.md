@@ -49,7 +49,6 @@ Just HTML, CSS, and vanilla JavaScript in a single file (`index.html`). No frame
 
 Inventra needs somewhere to persist your data between visits. It auto-detects its environment:
 
-- **Inside Claude** (as an Artifact): uses Claude's built-in per-user storage.
 - **Deployed anywhere else** (GitHub Pages, Netlify, your own server, or just opened locally): automatically falls back to the browser's `localStorage`.
 
 **Important limitation:** `localStorage` is scoped to one browser on one device. If you open the deployed site on your phone and then on a laptop, they won't share data automatically. Use **Settings → Export data** to download a backup and **Import data** to load it on the other device.
