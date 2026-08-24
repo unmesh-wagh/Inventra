@@ -20,6 +20,8 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap"
     rel="stylesheet">
+
+
   <style>
     :root {
       --bg: #EEF1EC;
@@ -45,6 +47,30 @@
       --shadow-sm: 0 1px 2px rgba(20, 25, 20, 0.05), 0 1px 1px rgba(20, 25, 20, 0.04);
       --shadow-md: 0 6px 18px rgba(20, 25, 20, 0.09), 0 2px 5px rgba(20, 25, 20, 0.05);
       --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    #logoutBtn {
+      position: fixed;
+      top: 18px;
+      right: 75px;
+      z-index: 1000;
+
+      padding: 8px 16px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+
+      background: transparent;
+      color: #ffffff;
+
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+
+      transition: all 0.2s ease;
+    }
+
+    #logoutBtn:hover {
+      background: rgba(255, 255, 255, 0.1);
     }
 
     * {
@@ -1141,6 +1167,11 @@
 
   <div class="toast" id="toast"></div>
 
+  <!-- your existing HTML above -->
+
+  <button id="logoutBtn">Logout</button>
+
+
   <script type="module">
 
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
@@ -1168,6 +1199,16 @@
     const firebaseApp = initializeApp(firebaseConfig);
     const auth = getAuth(firebaseApp);
     const googleProvider = new GoogleAuthProvider();
+
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    logoutBtn.addEventListener('click', async () => {
+      try {
+        await signOut(auth);
+      } catch (error) {
+        console.error('Logout failed:', error);
+      }
+    });
 
     /* ================= FIREBASE AUTH UI ================= */
 
