@@ -3,6 +3,14 @@
 
 <head>
   <meta charset="UTF-8">
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('inventra-theme');
+        if (t === 'dark') { document.documentElement.setAttribute('data-theme', 'dark'); }
+      } catch (e) {}
+    })();
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
   <title>Inventra — Stock, Credit &amp; Profit</title>
   <link rel="icon" type="image/png" sizes="32x32"
@@ -47,6 +55,23 @@
       --shadow-sm: 0 1px 2px rgba(20, 25, 20, 0.05), 0 1px 1px rgba(20, 25, 20, 0.04);
       --shadow-md: 0 6px 18px rgba(20, 25, 20, 0.09), 0 2px 5px rgba(20, 25, 20, 0.05);
       --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --bar: #171B18;
+    }
+
+    html[data-theme="dark"] {
+      --bg:#11140F;
+      --surface:#1B211B;
+      --surface-2:#222A20;
+      --ink:#EDF1EA;
+      --ink-soft:#A9B3A4;
+      --ink-faint:#76806F;
+      --line:#2E362A;
+      --teal-bg:rgba(14,124,102,0.22);
+      --amber-bg:rgba(193,121,26,0.22);
+      --coral-bg:rgba(193,68,46,0.22);
+      --violet-bg:rgba(101,82,198,0.28);
+      --shadow-sm:0 1px 2px rgba(0,0,0,0.35), 0 1px 1px rgba(0,0,0,0.25);
+      --shadow-md:0 6px 18px rgba(0,0,0,0.45), 0 2px 5px rgba(0,0,0,0.3);
     }
 
     #logoutBtn {
@@ -105,7 +130,7 @@
       position: sticky;
       top: 0;
       z-index: 20;
-      background: var(--ink);
+      background: var(--bar);
       color: #fff;
       padding: 14px 16px 13px;
       display: flex;
@@ -522,7 +547,7 @@
       height: 34px;
       border-radius: 9px;
       border: none;
-      background: var(--ink);
+      background: var(--bar);
       color: #fff;
       font-size: 18px;
       font-weight: 600;
@@ -550,7 +575,7 @@
       text-align: center;
       font-size: 19px;
       font-weight: 600;
-      background: var(--ink);
+      background: var(--bar);
       color: #fff;
       border-radius: 8px;
       padding: 6px 4px;
@@ -704,7 +729,7 @@
 
     /* ---- Profit tab ---- */
     .profit-hero {
-      background: linear-gradient(155deg, #16201B, var(--ink));
+      background: linear-gradient(155deg, #16201B, var(--bar));
       border-radius: var(--radius);
       padding: 18px;
       margin-bottom: 16px;
@@ -836,7 +861,7 @@
       right: 12px;
       bottom: calc(10px + var(--safe-bottom));
       z-index: 20;
-      background: var(--ink);
+      background: var(--bar);
       border-radius: 20px;
       padding: 7px;
       display: flex;
@@ -875,7 +900,7 @@
       left: 50%;
       bottom: calc(96px + var(--safe-bottom));
       transform: translateX(-50%);
-      background: var(--ink);
+      background: var(--bar);
       color: #fff;
       padding: 9px 16px;
       border-radius: 20px;
@@ -920,6 +945,24 @@
       border-color: var(--coral);
     }
 
+    .theme-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    }
+    .theme-row-label { font-size: 14px; font-weight: 500; }
+    .theme-row-sub { font-size: 11.5px; color: var(--ink-soft); margin-top: 2px; }
+    .switch { position: relative; display: inline-block; width: 46px; height: 27px; flex-shrink: 0; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch .slider {
+      position: absolute; cursor: pointer; inset: 0;
+      background: var(--line); border-radius: 999px; transition: background 0.18s ease;
+    }
+    .switch .slider::before {
+      content: ""; position: absolute; height: 21px; width: 21px; left: 3px; bottom: 3px;
+      background: #fff; border-radius: 50%; transition: transform 0.18s ease; box-shadow: var(--shadow-sm);
+    }
+    .switch input:checked + .slider { background: var(--teal); }
+    .switch input:checked + .slider::before { transform: translateX(19px); }
+
     .loading {
       padding: 40px 20px;
       text-align: center;
@@ -954,6 +997,23 @@
 
   <div class="settings-panel" id="settingsPanel">
     <div class="container">
+      <div class="card">
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+            stroke-linejoin="round">
+            <circle cx="12" cy="12" r="4"></circle>
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
+          </svg>Appearance</h3>
+        <div class="theme-row">
+          <div>
+            <div class="theme-row-label">Dark mode</div>
+            <div class="theme-row-sub">Easier on the eyes in low light</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="themeToggle">
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
       <div class="card">
         <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
             stroke-linejoin="round">
@@ -1187,6 +1247,17 @@
       onAuthStateChanged
     } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js";
 
+    import {
+      getFirestore,
+      doc,
+      collection,
+      getDoc,
+      setDoc,
+      deleteDoc,
+      getDocs,
+      serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
+
     const firebaseConfig = {
       apiKey: "AIzaSyBsexvzWyc89uHBPypgdSfZXi4EiFM_cNo",
       authDomain: "inventra-system.firebaseapp.com",
@@ -1198,6 +1269,7 @@
 
     const firebaseApp = initializeApp(firebaseConfig);
     const auth = getAuth(firebaseApp);
+    const db = getFirestore(firebaseApp);
     const googleProvider = new GoogleAuthProvider();
 
     const logoutBtn = document.getElementById('logoutBtn');
@@ -1205,10 +1277,45 @@
     logoutBtn.addEventListener('click', async () => {
       try {
         await signOut(auth);
+        location.reload();
       } catch (error) {
         console.error('Logout failed:', error);
       }
     });
+
+    /* ================= CLOUD STORAGE (Firestore) =================
+       Mirrors the same get/set/delete/list interface the app already
+       uses, but reads/writes to Firestore under this signed-in user's
+       own uid instead of the browser's local storage. This is what
+       actually makes data follow the account across devices. */
+    function buildFirestoreBackend(uid) {
+      function ref(key) { return doc(db, 'users', uid, 'appData', key); }
+      return {
+        get: function (key) {
+          return getDoc(ref(key)).then(function (snap) {
+            if (!snap.exists()) return Promise.reject(new Error('not found'));
+            return { key: key, value: snap.data().value, shared: false };
+          });
+        },
+        set: function (key, value) {
+          return setDoc(ref(key), { value: value, updatedAt: serverTimestamp() }).then(function () {
+            return { key: key, value: value, shared: false };
+          });
+        },
+        delete: function (key) {
+          return deleteDoc(ref(key)).then(function () {
+            return { key: key, deleted: true, shared: false };
+          });
+        },
+        list: function (prefix) {
+          return getDocs(collection(db, 'users', uid, 'appData')).then(function (snap) {
+            var keys = [];
+            snap.forEach(function (d) { if (!prefix || d.id.indexOf(prefix) === 0) keys.push(d.id); });
+            return { keys: keys, prefix: prefix, shared: false };
+          });
+        }
+      };
+    }
 
     /* ================= FIREBASE AUTH UI ================= */
 
@@ -1502,12 +1609,20 @@
       }
     });
 
+    var __inventraBooted = false;
+    function __inventraBootOnce() {
+      if (__inventraBooted) return;
+      __inventraBooted = true;
+      if (window.__inventraBoot) window.__inventraBoot();
+    }
+
     onAuthStateChanged(auth, function (user) {
 
       if (user) {
         console.log("Inventra user signed in:", user.uid);
-
+        window.storage = buildFirestoreBackend(user.uid);
         authScreen.classList.add("hidden");
+        __inventraBootOnce();
 
       } else {
         console.log("No Inventra user signed in.");
@@ -1516,6 +1631,18 @@
       }
 
     });
+
+    /* Safety net: if Firebase can't reach the network (offline, ad-blocker,
+       corporate proxy, etc.) don't leave the person stuck on the sign-in
+       screen forever — fall back to this device's local storage after a
+       few seconds so the app is still usable. */
+    setTimeout(function () {
+      if (__inventraBooted) return;
+      if (auth.currentUser) return;
+      console.warn("Inventra: no auth response yet, continuing with local-only storage.");
+      authScreen.classList.add("hidden");
+      __inventraBootOnce();
+    }, 6000);
 
     /* ================= END FIREBASE AUTH UI ================= */
 
@@ -2074,7 +2201,14 @@
       var panels = [panelInventory, panelCustomers, panelProfit];
       var subs = ['Inventory', 'Customer tabs', 'Profit overview'];
 
+      function closeSettings() {
+        if (!settingsOpen) return;
+        settingsOpen = false;
+        settingsPanel.classList.remove('show');
+        mainViews.style.display = '';
+      }
       function switchTo(idx) {
+        closeSettings();
         navBtns.forEach(function (b, i) { b.classList.toggle('active', i === idx); });
         panels.forEach(function (p, i) { p.classList.toggle('active', i === idx); });
         headerSub.textContent = subs[idx];
@@ -2094,6 +2228,20 @@
         settingsPanel.classList.toggle('show', settingsOpen);
         mainViews.style.display = settingsOpen ? 'none' : '';
       });
+
+      /* ---------------- theme ---------------- */
+      var themeToggle = document.getElementById('themeToggle');
+      function applyTheme(theme) {
+        if (theme === 'dark') { document.documentElement.setAttribute('data-theme', 'dark'); }
+        else { document.documentElement.removeAttribute('data-theme'); }
+        try { localStorage.setItem('inventra-theme', theme); } catch (e) {}
+      }
+      if (themeToggle) {
+        themeToggle.checked = document.documentElement.getAttribute('data-theme') === 'dark';
+        themeToggle.addEventListener('change', function () {
+          applyTheme(themeToggle.checked ? 'dark' : 'light');
+        });
+      }
 
       function wireReset(btnId, label, doReset) {
         var pending = false;
@@ -2192,7 +2340,11 @@
         renderCustomers();
         renderProfit();
       }
-      init();
+      // Boot is triggered from the Firebase auth-state handler above,
+      // once it has decided whether to use the signed-in user's cloud
+      // storage or (if signed out / offline) local storage. That avoids
+      // the app loading local data first and only *looking* synced.
+      window.__inventraBoot = init;
     })();
   </script>
 </body>
