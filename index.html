@@ -1296,34 +1296,62 @@
        uses, but reads/writes to Firestore under this signed-in user's
        own uid instead of the browser's local storage. This is what
        actually makes data follow the account across devices. */
+    function withTimeout(promise, ms, label) {
+      return new Promise(function (resolve, reject) {
+        var settled = false;
+        var timer = setTimeout(function () {
+          if (settled) return;
+          settled = true;
+          reject(new Error((label || 'Request') + ' timed out after ' + ms + 'ms \u2014 check your connection'));
+        }, ms);
+        promise.then(
+          function (v) { if (settled) return; settled = true; clearTimeout(timer); resolve(v); },
+          function (e) { if (settled) return; settled = true; clearTimeout(timer); reject(e); }
+        );
+      });
+    }
     function buildFirestoreBackend(uid) {
+      var TIMEOUT_MS = 8000;
       function ref(key) { return doc(db, 'users', uid, 'appData', key); }
       return {
         get: function (key) {
-          return getDoc(ref(key)).then(function (snap) {
+          return withTimeout(getDoc(ref(key)), TIMEOUT_MS, "Loading '" + key + "'").then(function (snap) {
             if (!snap.exists()) return Promise.reject(new Error('not found'));
             return { key: key, value: snap.data().value, shared: false };
+          }).catch(function (err) {
+            console.error('Firestore get(' + key + ') failed:', err);
+            throw err;
           });
         },
         set: function (key, value) {
-          return setDoc(ref(key), { value: value, updatedAt: serverTimestamp() }).then(function () {
+          return withTimeout(setDoc(ref(key), { value: value, updatedAt: serverTimestamp() }), TIMEOUT_MS, "Saving '" + key + "'").then(function () {
             return { key: key, value: value, shared: false };
+          }).catch(function (err) {
+            console.error('Firestore set(' + key + ') failed:', err);
+            throw err;
           });
         },
         delete: function (key) {
-          return deleteDoc(ref(key)).then(function () {
+          return withTimeout(deleteDoc(ref(key)), TIMEOUT_MS, "Deleting '" + key + "'").then(function () {
             return { key: key, deleted: true, shared: false };
+          }).catch(function (err) {
+            console.error('Firestore delete(' + key + ') failed:', err);
+            throw err;
           });
         },
         list: function (prefix) {
-          return getDocs(collection(db, 'users', uid, 'appData')).then(function (snap) {
+          return withTimeout(getDocs(collection(db, 'users', uid, 'appData')), TIMEOUT_MS, 'Listing data').then(function (snap) {
             var keys = [];
             snap.forEach(function (d) { if (!prefix || d.id.indexOf(prefix) === 0) keys.push(d.id); });
             return { keys: keys, prefix: prefix, shared: false };
+          }).catch(function (err) {
+            console.error('Firestore list() failed:', err);
+            throw err;
           });
         }
       };
     }
+
 
     /* ================= FIREBASE AUTH UI ================= */
 
@@ -1799,11 +1827,19 @@
 
       /* ---------------- storage ---------------- */
       async function loadData() {
-        try { var p = await window.storage.get('products', false); state.products = p ? JSON.parse(p.value) : []; } catch (e) { state.products = []; }
-        try { var pn = await window.storage.get('productNames', false); state.productNames = pn ? JSON.parse(pn.value) : []; } catch (e) { state.productNames = []; }
-        try { var c = await window.storage.get('customers', false); state.customers = c ? JSON.parse(c.value) : []; } catch (e) { state.customers = []; }
-        try { var cn = await window.storage.get('customerNames', false); state.customerNames = cn ? JSON.parse(cn.value) : []; } catch (e) { state.customerNames = []; }
-        try { var sl = await window.storage.get('salesLog', false); state.salesLog = sl ? JSON.parse(sl.value) : {}; } catch (e) { state.salesLog = {}; }
+        var keys = ['products', 'productNames', 'customers', 'customerNames', 'salesLog'];
+        var results = await Promise.allSettled(keys.map(function (k) { return window.storage.get(k, false); }));
+        function val(i) { return results[i].status === 'fulfilled' ? results[i].value : null; }
+        try { var p = val(0); state.products = p ? JSON.parse(p.value) : []; } catch (e) { state.products = []; }
+        try { var pn = val(1); state.productNames = pn ? JSON.parse(pn.value) : []; } catch (e) { state.productNames = []; }
+        try { var c = val(2); state.customers = c ? JSON.parse(c.value) : []; } catch (e) { state.customers = []; }
+        try { var cn = val(3); state.customerNames = cn ? JSON.parse(cn.value) : []; } catch (e) { state.customerNames = []; }
+        try { var sl = val(4); state.salesLog = sl ? JSON.parse(sl.value) : {}; } catch (e) { state.salesLog = {}; }
+        var failed = results.filter(function (r) { return r.status === 'rejected'; });
+        if (failed.length) {
+          console.error('Inventra: some data failed to load:', failed.map(function (r) { return r.reason && r.reason.message; }));
+          toast("Couldn't reach the cloud \u2014 showing what's saved on this device");
+        }
         state.loaded = true;
       }
       async function saveProducts() {
@@ -2396,6 +2432,19 @@
       // the app loading local data first and only *looking* synced.
       window.__inventraBoot = init;
     })();
+  </script>
+
+  <!-- Independent watchdog: doesn't rely on anything above working, so it
+       still fires even if auth or Firestore code fails in an unexpected
+       way. Gives a way out instead of a screen that's stuck forever. -->
+  <script>
+    setTimeout(function () {
+      var el = document.getElementById('loadingMsg');
+      if (el && el.offsetParent !== null) {
+        el.innerHTML = 'This is taking longer than expected.<br>' +
+          '<button onclick="location.reload()" style="margin-top:12px;padding:10px 18px;border-radius:10px;border:1.5px solid var(--line,#ccc);background:var(--surface,#fff);color:var(--ink,#171B18);font-size:14px;font-weight:600;cursor:pointer;">Reload</button>';
+      }
+    }, 15000);
   </script>
 </body>
 
