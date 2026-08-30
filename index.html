@@ -75,6 +75,16 @@
     }
 
     .topbar-actions { display: flex; align-items: center; gap: 8px; }
+    .sync-badge {
+      display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 500;
+      color: #B7BFB2; padding: 0 3px; white-space: nowrap;
+    }
+    .sync-dot { width: 7px; height: 7px; border-radius: 50%; background: #8B9186; flex-shrink: 0; }
+    .sync-dot.synced { background: #2FD48A; }
+    .sync-dot.offline { background: #E2504A; }
+    .sync-dot.syncing { background: #F2B84B; animation: sync-pulse 1s ease-in-out infinite; }
+    @keyframes sync-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+    @media (max-width: 380px) { .sync-badge span:last-child { display: none; } }
     .avatar-btn {
       width: 32px; height: 32px; border-radius: 50%; padding: 0; flex-shrink: 0; cursor: pointer;
       border: 1.5px solid rgba(255,255,255,0.25); background: var(--teal-bg); color: var(--teal-deep);
@@ -474,6 +484,16 @@
 
     .row-meta .chip:active {
       background: var(--line);
+    }
+
+    .row-meta .chip-icon {
+      width: 22px;
+      height: 22px;
+      padding: 0;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .row-meta .chip.editing {
@@ -959,11 +979,24 @@
     .switch input:checked + .slider::before { transform: translateX(19px); }
 
     .loading {
-      padding: 40px 20px;
-      text-align: center;
-      color: var(--ink-soft);
-      font-size: 14px;
+      padding: 16px 14px;
     }
+    .loading .container { max-width: 520px; margin: 0 auto; }
+    .skel {
+      background: linear-gradient(100deg, var(--surface-2) 30%, var(--line) 50%, var(--surface-2) 70%);
+      background-size: 220% 100%;
+      animation: skel-shimmer 1.3s ease-in-out infinite;
+      border-radius: 8px;
+    }
+    @keyframes skel-shimmer {
+      0% { background-position: 140% 0; }
+      100% { background-position: -40% 0; }
+    }
+    .skel-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; margin-bottom: 16px; }
+    .skel-stat { height: 72px; border-radius: var(--radius); }
+    .skel-card { height: 220px; border-radius: var(--radius); margin-bottom: 16px; }
+    .skel-row { height: 150px; border-radius: var(--radius); margin-bottom: 10px; }
+
   </style>
 </head>
 
@@ -980,6 +1013,10 @@
       </div>
     </div>
     <div class="topbar-actions">
+      <span class="sync-badge" id="syncBadge" title="Sync status">
+        <span class="sync-dot" id="syncDot"></span>
+        <span id="syncText">Syncing…</span>
+      </span>
       <button class="avatar-btn" id="accountAvatarBtn" aria-label="Account"></button>
       <button class="icon-btn" id="settingsToggle" aria-label="Settings">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -1054,7 +1091,18 @@
   </div>
 
   <div id="mainViews">
-    <div class="loading" id="loadingMsg">Loading your data…</div>
+    <div class="loading" id="loadingMsg">
+      <div class="container">
+        <div class="skel-stats">
+          <div class="skel skel-stat"></div>
+          <div class="skel skel-stat"></div>
+          <div class="skel skel-stat"></div>
+        </div>
+        <div class="skel skel-card"></div>
+        <div class="skel skel-row"></div>
+        <div class="skel skel-row"></div>
+      </div>
+    </div>
 
     <!-- INVENTORY -->
     <div class="panel" id="panel-inventory">
@@ -1104,16 +1152,16 @@
           <div class="row2">
             <div class="field">
               <label for="prodQty">Quantity</label>
-              <input type="number" id="prodQty" placeholder="1" min="0">
+              <input type="number" id="prodQty" placeholder="1" min="0" inputmode="decimal">
             </div>
             <div class="field">
               <label for="prodPrice">Sale price (₹)</label>
-              <input type="number" id="prodPrice" placeholder="0.00" min="0" step="0.01">
+              <input type="number" id="prodPrice" placeholder="0.00" min="0" step="0.01" inputmode="decimal">
             </div>
           </div>
           <div class="field">
             <label for="prodMargin">Profit margin per unit (₹)</label>
-            <input type="number" id="prodMargin" placeholder="e.g. 2.50" min="0" step="0.01">
+            <input type="number" id="prodMargin" placeholder="e.g. 2.50" min="0" step="0.01" inputmode="decimal">
           </div>
           <button class="btn" id="addProductBtn">Add to inventory</button>
         </div>
@@ -1161,7 +1209,7 @@
           </div>
           <div class="field">
             <label for="custStart">Starting balance owed (optional)</label>
-            <input type="number" id="custStart" placeholder="0.00" min="0" step="0.01">
+            <input type="number" id="custStart" placeholder="0.00" min="0" step="0.01" inputmode="decimal">
           </div>
           <button class="btn" id="addCustomerBtn">Add customer</button>
         </div>
@@ -1200,6 +1248,21 @@
                 style="background:var(--line); border:1px solid var(--ink-faint);"></span>Last week</span>
           </div>
           <div class="chart-wrap" id="chartWrap"></div>
+        </div>
+
+        <div class="card">
+          <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+              stroke-linejoin="round">
+              <path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+            </svg>Revenue, day by day</h3>
+          <div class="row-meta" style="margin-bottom:10px;">Total sale value before margin \u2014 what came in, not what you kept.</div>
+          <div class="chart-legend">
+            <span><span class="legend-dot" style="background:var(--violet);"></span>This week</span>
+            <span><span class="legend-dot"
+                style="background:var(--line); border:1px solid var(--ink-faint);"></span>Last week</span>
+          </div>
+          <div class="chart-wrap" id="revenueChartWrap"></div>
+          <div class="profit-hero-sub" id="revenueHeroSub" style="margin-top:10px;">Today: ₹0.00 · This week: ₹0.00 · Last week: ₹0.00</div>
         </div>
 
         <div class="section-label">Weekly history</div>
@@ -1256,7 +1319,9 @@
     } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js";
 
     import {
-      getFirestore,
+      initializeFirestore,
+      persistentLocalCache,
+      persistentSingleTabManager,
       doc,
       collection,
       getDoc,
@@ -1277,7 +1342,13 @@
 
     const firebaseApp = initializeApp(firebaseConfig);
     const auth = getAuth(firebaseApp);
-    const db = getFirestore(firebaseApp);
+    // Persistent local cache: after the first successful sync, subsequent
+    // loads read from an on-device cache first (near-instant) while
+    // Firestore updates it in the background, instead of always waiting
+    // on a full network round trip.
+    const db = initializeFirestore(firebaseApp, {
+      localCache: persistentLocalCache({ tabManager: persistentSingleTabManager({}) })
+    });
     const googleProvider = new GoogleAuthProvider();
 
     const logoutBtn = document.getElementById('logoutBtn');
@@ -1379,6 +1450,7 @@
     border-radius: 24px;
     padding: 32px;
     box-shadow: 0 20px 60px rgba(0,0,0,.12);
+    color: #111;
   }
 
   .auth-logo {
@@ -1386,6 +1458,7 @@
     font-weight: 800;
     letter-spacing: -1px;
     margin-bottom: 8px;
+    color: #111 !important;
   }
 
   .auth-subtitle {
@@ -1397,6 +1470,7 @@
     font-size: 24px;
     font-weight: 750;
     margin-bottom: 20px;
+    color: #111 !important;
   }
 
   .auth-input {
@@ -1408,6 +1482,8 @@
     border-radius: 12px;
     font-size: 15px;
     outline: none;
+    color: #111;
+    background: #fff;
   }
 
   .auth-input:focus {
@@ -1487,12 +1563,12 @@
     authScreen.innerHTML = `
   <div class="auth-card">
 
-    <div class="auth-logo">INVENTRA</div>
+    <div class="auth-logo" style="color:#111;">INVENTRA</div>
     <div class="auth-subtitle">
       Stock. Credit. Profit.
     </div>
 
-    <div class="auth-title" id="authTitle">
+    <div class="auth-title" id="authTitle" style="color:#111;">
       Welcome back
     </div>
 
@@ -1551,6 +1627,12 @@
     function showAuthError(message) {
       authError.textContent = message;
     }
+
+    [authEmail, authPassword].forEach(function (el) {
+      el.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter') { ev.preventDefault(); emailAuthBtn.click(); }
+      });
+    });
 
     authSwitchBtn.addEventListener("click", function () {
       authSignupMode = !authSignupMode;
@@ -1773,6 +1855,7 @@
         customers: [],
         customerNames: [],
         salesLog: {},
+        revenueLog: {},
         loaded: false
       };
 
@@ -1826,15 +1909,44 @@
       }
 
       /* ---------------- storage ---------------- */
+      /* ---------------- sync status badge ---------------- */
+      var syncPending = 0;
+      var lastSyncOk = true;
+      var syncDotEl = document.getElementById('syncDot');
+      var syncTextEl = document.getElementById('syncText');
+      function setSyncUI() {
+        if (!syncDotEl || !syncTextEl) return;
+        if (syncPending > 0) {
+          syncDotEl.className = 'sync-dot syncing';
+          syncTextEl.textContent = 'Syncing…';
+        } else if (!navigator.onLine || !lastSyncOk) {
+          syncDotEl.className = 'sync-dot offline';
+          syncTextEl.textContent = 'Offline';
+        } else {
+          syncDotEl.className = 'sync-dot synced';
+          syncTextEl.textContent = 'Synced';
+        }
+      }
+      function trackSync(promise) {
+        syncPending++; setSyncUI();
+        return promise.then(
+          function (v) { lastSyncOk = true; syncPending--; setSyncUI(); return v; },
+          function (e) { lastSyncOk = false; syncPending--; setSyncUI(); throw e; }
+        );
+      }
+      window.addEventListener('online', function () { lastSyncOk = true; setSyncUI(); });
+      window.addEventListener('offline', setSyncUI);
+
       async function loadData() {
-        var keys = ['products', 'productNames', 'customers', 'customerNames', 'salesLog'];
-        var results = await Promise.allSettled(keys.map(function (k) { return window.storage.get(k, false); }));
+        var keys = ['products', 'productNames', 'customers', 'customerNames', 'salesLog', 'revenueLog'];
+        var results = await Promise.allSettled(keys.map(function (k) { return trackSync(window.storage.get(k, false)); }));
         function val(i) { return results[i].status === 'fulfilled' ? results[i].value : null; }
         try { var p = val(0); state.products = p ? JSON.parse(p.value) : []; } catch (e) { state.products = []; }
         try { var pn = val(1); state.productNames = pn ? JSON.parse(pn.value) : []; } catch (e) { state.productNames = []; }
         try { var c = val(2); state.customers = c ? JSON.parse(c.value) : []; } catch (e) { state.customers = []; }
         try { var cn = val(3); state.customerNames = cn ? JSON.parse(cn.value) : []; } catch (e) { state.customerNames = []; }
         try { var sl = val(4); state.salesLog = sl ? JSON.parse(sl.value) : {}; } catch (e) { state.salesLog = {}; }
+        try { var rl = val(5); state.revenueLog = rl ? JSON.parse(rl.value) : {}; } catch (e) { state.revenueLog = {}; }
         var failed = results.filter(function (r) { return r.status === 'rejected'; });
         if (failed.length) {
           console.error('Inventra: some data failed to load:', failed.map(function (r) { return r.reason && r.reason.message; }));
@@ -1844,18 +1956,21 @@
       }
       async function saveProducts() {
         try {
-          await window.storage.set('products', JSON.stringify(state.products), false);
-          await window.storage.set('productNames', JSON.stringify(state.productNames), false);
+          await trackSync(window.storage.set('products', JSON.stringify(state.products), false));
+          await trackSync(window.storage.set('productNames', JSON.stringify(state.productNames), false));
         } catch (e) { toast("Couldn't save — try again"); }
       }
       async function saveCustomers() {
         try {
-          await window.storage.set('customers', JSON.stringify(state.customers), false);
-          await window.storage.set('customerNames', JSON.stringify(state.customerNames), false);
+          await trackSync(window.storage.set('customers', JSON.stringify(state.customers), false));
+          await trackSync(window.storage.set('customerNames', JSON.stringify(state.customerNames), false));
         } catch (e) { toast("Couldn't save — try again"); }
       }
       async function saveSalesLog() {
-        try { await window.storage.set('salesLog', JSON.stringify(state.salesLog), false); } catch (e) { toast("Couldn't save — try again"); }
+        try { await trackSync(window.storage.set('salesLog', JSON.stringify(state.salesLog), false)); } catch (e) { toast("Couldn't save — try again"); }
+      }
+      async function saveRevenueLog() {
+        try { await trackSync(window.storage.set('revenueLog', JSON.stringify(state.revenueLog), false)); } catch (e) { toast("Couldn't save — try again"); }
       }
 
       function rememberName(list, name) {
@@ -1903,6 +2018,9 @@
       function sellIcon() {
         return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>';
       }
+      function pencilIcon() {
+        return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path></svg>';
+      }
 
       /* ---------------- products ---------------- */
       var prodNameInput = document.getElementById('prodName');
@@ -1914,8 +2032,14 @@
       var productList = document.getElementById('productList');
 
       wireAutocomplete(prodNameInput, prodSuggest, function () { return state.productNames; });
+      var addProductBtnEl = document.getElementById('addProductBtn');
+      [prodNameInput, prodQtyInput, prodPriceInput, prodMarginInput].forEach(function (el) {
+        el.addEventListener('keydown', function (ev) {
+          if (ev.key === 'Enter') { ev.preventDefault(); addProductBtnEl.click(); }
+        });
+      });
 
-      document.getElementById('addProductBtn').addEventListener('click', async function () {
+      addProductBtnEl.addEventListener('click', async function () {
         var name = prodNameInput.value.trim();
         if (!name) { toast('Enter a product name first'); prodNameInput.focus(); return; }
         var qty = parseFloat(prodQtyInput.value); if (isNaN(qty)) qty = 1;
@@ -1933,9 +2057,9 @@
           toast('Added "' + name + '"');
         }
         rememberName(state.productNames, name);
-        await saveProducts();
         prodNameInput.value = ''; prodQtyInput.value = ''; prodPriceInput.value = ''; prodMarginInput.value = '';
         renderProducts();
+        saveProducts();
       });
 
       prodSearch.addEventListener('input', renderProducts);
@@ -1958,20 +2082,23 @@
         var n = parseFloat(val); if (isNaN(n) || n < 0) n = p.margin || 0;
         p.margin = n; saveProducts(); renderProducts();
       }
-      async function recordSale(id, qty) {
+      function recordSale(id, qty) {
         var p = state.products.find(function (x) { return x.id === id; });
         if (!p) return;
         qty = Math.min(qty, p.qty);
         if (qty <= 0) { toast('Not enough stock'); return; }
         p.qty = Math.round((p.qty - qty) * 100) / 100;
         var profit = Math.round(qty * (p.margin || 0) * 100) / 100;
+        var revenue = Math.round(qty * (p.price || 0) * 100) / 100;
         var key = dateKey(new Date());
         state.salesLog[key] = Math.round(((state.salesLog[key] || 0) + profit) * 100) / 100;
-        await saveProducts();
-        await saveSalesLog();
+        state.revenueLog[key] = Math.round(((state.revenueLog[key] || 0) + revenue) * 100) / 100;
         toast('Sale recorded · +₹' + money(profit) + ' profit');
         renderProducts();
         renderProfit();
+        saveProducts();
+        saveSalesLog();
+        saveRevenueLog();
       }
 
       var pendingDeleteProduct = null;
@@ -2007,12 +2134,12 @@
         productList.innerHTML = items.map(function (p) {
           var lowClass = p.qty <= LOW_STOCK_THRESHOLD ? ' low' : '';
           var priceStr = (p.price !== null && p.price !== undefined && p.price !== '') ? '₹' + money(p.price) : 'No price';
-          var marginStr = '₹' + money(p.margin || 0) + ' margin';
           return '' +
             '<div class="row" data-id="' + p.id + '">' +
             '<div class="row-top">' +
             '<div><div class="row-name">' + escapeHtml(p.name) + '</div>' +
-            '<div class="row-meta"><span>' + priceStr + '</span><span class="chip" data-action="edit-margin">' + marginStr + '</span></div></div>' +
+            '<div class="row-meta"><span>' + priceStr + '</span>' +
+            '<button class="chip chip-icon" data-action="edit-margin" aria-label="Edit margin" title="Edit margin">' + pencilIcon() + '</button></div></div>' +
             '<button class="trash" data-action="discard" aria-label="Remove product">' + trashIcon() + '</button>' +
             '</div>' +
             '<div class="section-label">Stock correction</div>' +
@@ -2021,10 +2148,10 @@
             '<div class="qty-display mono' + lowClass + '" data-action="edit">' + fmtQty(p.qty) + '</div>' +
             '<button class="step-btn plus" data-action="plus" aria-label="Add">+</button>' +
             '</div>' +
-            '<div class="amt-row"><input type="number" placeholder="Amount (blank = 1)" class="adjust-amt" min="0" step="any"></div>' +
-            '<div class="section-label">Sell (reduces stock, logs profit)</div>' +
+            '<div class="amt-row"><input type="number" placeholder="Amount (blank = 1)" class="adjust-amt" min="0" step="any" inputmode="decimal"></div>' +
+            '<div class="section-label">Sell (reduces stock)</div>' +
             '<div class="sell-row">' +
-            '<input type="number" placeholder="Qty sold (blank = 1)" class="sell-amt" min="0" step="any">' +
+            '<input type="number" placeholder="Qty sold (blank = 1)" class="sell-amt" min="0" step="any" inputmode="decimal">' +
             '<button class="sell-btn" data-action="sell">' + sellIcon() + 'Sell</button>' +
             '</div>' +
             '</div>';
@@ -2058,7 +2185,7 @@
           marginChip.addEventListener('click', function () {
             var p = state.products.find(function (x) { return x.id === id; });
             marginChip.classList.add('editing');
-            marginChip.innerHTML = '<input type="number" value="' + (p.margin || 0) + '" min="0" step="0.01">';
+            marginChip.innerHTML = '<input type="number" value="' + (p.margin || 0) + '" min="0" step="0.01" placeholder="Margin ₹">';
             var inp = marginChip.querySelector('input'); inp.focus(); inp.select();
             function commit() { setProductMargin(id, inp.value); }
             inp.addEventListener('blur', commit);
@@ -2066,10 +2193,14 @@
           });
 
           var sellAmt = rowEl.querySelector('.sell-amt');
-          rowEl.querySelector('[data-action="sell"]').addEventListener('click', function () {
+          var sellBtnEl = rowEl.querySelector('[data-action="sell"]');
+          sellBtnEl.addEventListener('click', function () {
             var amt = parseFloat(sellAmt.value); if (isNaN(amt) || amt <= 0) amt = 1;
             recordSale(id, amt);
             sellAmt.value = '';
+          });
+          sellAmt.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Enter') { ev.preventDefault(); sellBtnEl.click(); }
           });
         });
       }
@@ -2083,8 +2214,14 @@
       var customerList = document.getElementById('customerList');
 
       wireAutocomplete(custNameInput, custSuggest, function () { return state.customerNames; });
+      var addCustomerBtnEl = document.getElementById('addCustomerBtn');
+      [custNameInput, custStartInput].forEach(function (el) {
+        el.addEventListener('keydown', function (ev) {
+          if (ev.key === 'Enter') { ev.preventDefault(); addCustomerBtnEl.click(); }
+        });
+      });
 
-      document.getElementById('addCustomerBtn').addEventListener('click', async function () {
+      addCustomerBtnEl.addEventListener('click', async function () {
         var name = custNameInput.value.trim();
         if (!name) { toast('Enter a customer name first'); custNameInput.focus(); return; }
         var start = parseFloat(custStartInput.value); if (isNaN(start)) start = 0;
@@ -2098,9 +2235,9 @@
           toast('Added "' + name + '"');
         }
         rememberName(state.customerNames, name);
-        await saveCustomers();
         custNameInput.value = ''; custStartInput.value = '';
         renderCustomers();
+        saveCustomers();
       });
 
       custSearch.addEventListener('input', renderCustomers);
@@ -2159,7 +2296,7 @@
             '<button class="trash" data-action="discard" aria-label="Remove customer">' + trashIcon() + '</button>' +
             '</div>' +
             '<div class="balance-tag mono ' + tagClass + '" data-action="edit">' + label + '</div>' +
-            '<div class="amt-row"><input type="number" placeholder="Amount" class="adjust-amt" min="0" step="0.01"></div>' +
+            '<div class="amt-row"><input type="number" placeholder="Amount" class="adjust-amt" min="0" step="0.01" inputmode="decimal"></div>' +
             '<div class="cust-actions">' +
             '<button class="pill-btn charge" data-action="charge">+ Add charge</button>' +
             '<button class="pill-btn pay" data-action="pay">\u2212 Record payment</button>' +
@@ -2197,11 +2334,12 @@
       }
 
       /* ---------------- profit ---------------- */
-      function buildChartSvg(curVals, prevVals) {
+      function buildChartSvg(curVals, prevVals, curColor) {
         var w = 320, h = 170, padBottom = 22, padTop = 10;
         var maxVal = Math.max(1, Math.max.apply(null, curVals.concat(prevVals).map(Math.abs)));
         var groupW = w / 7;
         var barW = 11;
+        var color = curColor || 'var(--teal)';
         var svg = '<svg viewBox="0 0 ' + w + ' ' + h + '" style="width:100%; height:auto; display:block;">';
         for (var i = 0; i < 7; i++) {
           var gx = i * groupW + groupW / 2;
@@ -2209,7 +2347,7 @@
           var prevH = Math.round((prevVals[i] / maxVal) * (h - padBottom - padTop));
           var baseY = h - padBottom;
           svg += '<rect x="' + (gx - barW - 2) + '" y="' + (baseY - prevH) + '" width="' + barW + '" height="' + Math.max(prevH, 1) + '" rx="3" fill="var(--line)" stroke="var(--ink-faint)" stroke-width="0.5"></rect>';
-          svg += '<rect x="' + (gx + 2) + '" y="' + (baseY - curH) + '" width="' + barW + '" height="' + Math.max(curH, 1) + '" rx="3" fill="var(--teal)"></rect>';
+          svg += '<rect x="' + (gx + 2) + '" y="' + (baseY - curH) + '" width="' + barW + '" height="' + Math.max(curH, 1) + '" rx="3" fill="' + color + '"></rect>';
           svg += '<text x="' + gx + '" y="' + (h - 6) + '" text-anchor="middle" font-size="10.5" fill="var(--ink-soft)" font-family="Inter,sans-serif">' + DAY_LABELS[i] + '</text>';
         }
         svg += '</svg>';
@@ -2243,7 +2381,16 @@
           else { deltaPill.className = 'delta-pill delta-flat'; deltaPill.textContent = 'Flat vs last wk'; }
         }
 
-        document.getElementById('chartWrap').innerHTML = buildChartSvg(curVals, prevVals);
+        document.getElementById('chartWrap').innerHTML = buildChartSvg(curVals, prevVals, 'var(--teal)');
+
+        var curRevVals = curDates.map(function (d) { return state.revenueLog[dateKey(d)] || 0; });
+        var prevRevVals = prevDates.map(function (d) { return state.revenueLog[dateKey(d)] || 0; });
+        var curRevTotal = Math.round(curRevVals.reduce(function (a, b) { return a + b; }, 0) * 100) / 100;
+        var prevRevTotal = Math.round(prevRevVals.reduce(function (a, b) { return a + b; }, 0) * 100) / 100;
+        var todayRevenue = state.revenueLog[dateKey(today)] || 0;
+        document.getElementById('revenueChartWrap').innerHTML = buildChartSvg(curRevVals, prevRevVals, 'var(--violet)');
+        document.getElementById('revenueHeroSub').textContent =
+          'Today: ₹' + money(todayRevenue) + ' \u00b7 This week: ₹' + money(curRevTotal) + ' \u00b7 Last week: ₹' + money(prevRevTotal);
 
         var weekMap = {};
         Object.keys(state.salesLog).forEach(function (k) {
@@ -2351,7 +2498,7 @@
         state.customers = []; state.customerNames = []; saveCustomers(); renderCustomers(); toast('Customer tabs cleared');
       });
       wireReset('resetProfitBtn', 'Clear profit history', function () {
-        state.salesLog = {}; saveSalesLog(); renderProfit(); toast('Profit history cleared');
+        state.salesLog = {}; state.revenueLog = {}; saveSalesLog(); saveRevenueLog(); renderProfit(); toast('Profit history cleared');
       });
 
       /* ---------------- export / import ---------------- */
@@ -2363,7 +2510,8 @@
           productNames: state.productNames,
           customers: state.customers,
           customerNames: state.customerNames,
-          salesLog: state.salesLog
+          salesLog: state.salesLog,
+          revenueLog: state.revenueLog
         };
         var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
         var url = URL.createObjectURL(blob);
@@ -2402,10 +2550,12 @@
           state.customers = Array.isArray(data.customers) ? data.customers : [];
           state.customerNames = Array.isArray(data.customerNames) ? data.customerNames : [];
           state.salesLog = (data.salesLog && typeof data.salesLog === 'object') ? data.salesLog : {};
+          state.revenueLog = (data.revenueLog && typeof data.revenueLog === 'object') ? data.revenueLog : {};
 
           await saveProducts();
           await saveCustomers();
           await saveSalesLog();
+          await saveRevenueLog();
 
           renderProducts();
           renderCustomers();
