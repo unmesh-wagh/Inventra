@@ -1937,6 +1937,20 @@
       window.addEventListener('online', function () { lastSyncOk = true; setSyncUI(); });
       window.addEventListener('offline', setSyncUI);
 
+      /* Writes are fire-and-forget from the UI's perspective (instant screen
+         updates), but they must still land in Firestore in the order they
+         were made. Without this, two quick actions in a row (e.g. add a
+         product, then immediately sell it) can race over the network and
+         the OLDER snapshot can arrive second, silently overwriting the
+         newer one. Chaining every write through one queue guarantees each
+         save only starts once the previous one has actually finished. */
+      var saveQueue = Promise.resolve();
+      function queueSave(work) {
+        var run = function () { return work(); };
+        saveQueue = saveQueue.then(run, run);
+        return saveQueue;
+      }
+
       async function loadData() {
         var keys = ['products', 'productNames', 'customers', 'customerNames', 'salesLog', 'revenueLog'];
         var results = await Promise.allSettled(keys.map(function (k) { return trackSync(window.storage.get(k, false)); }));
@@ -1954,23 +1968,31 @@
         }
         state.loaded = true;
       }
-      async function saveProducts() {
-        try {
-          await trackSync(window.storage.set('products', JSON.stringify(state.products), false));
-          await trackSync(window.storage.set('productNames', JSON.stringify(state.productNames), false));
-        } catch (e) { toast("Couldn't save — try again"); }
+      function saveProducts() {
+        return queueSave(async function () {
+          try {
+            await trackSync(window.storage.set('products', JSON.stringify(state.products), false));
+            await trackSync(window.storage.set('productNames', JSON.stringify(state.productNames), false));
+          } catch (e) { toast("Couldn't save — try again"); }
+        });
       }
-      async function saveCustomers() {
-        try {
-          await trackSync(window.storage.set('customers', JSON.stringify(state.customers), false));
-          await trackSync(window.storage.set('customerNames', JSON.stringify(state.customerNames), false));
-        } catch (e) { toast("Couldn't save — try again"); }
+      function saveCustomers() {
+        return queueSave(async function () {
+          try {
+            await trackSync(window.storage.set('customers', JSON.stringify(state.customers), false));
+            await trackSync(window.storage.set('customerNames', JSON.stringify(state.customerNames), false));
+          } catch (e) { toast("Couldn't save — try again"); }
+        });
       }
-      async function saveSalesLog() {
-        try { await trackSync(window.storage.set('salesLog', JSON.stringify(state.salesLog), false)); } catch (e) { toast("Couldn't save — try again"); }
+      function saveSalesLog() {
+        return queueSave(async function () {
+          try { await trackSync(window.storage.set('salesLog', JSON.stringify(state.salesLog), false)); } catch (e) { toast("Couldn't save — try again"); }
+        });
       }
-      async function saveRevenueLog() {
-        try { await trackSync(window.storage.set('revenueLog', JSON.stringify(state.revenueLog), false)); } catch (e) { toast("Couldn't save — try again"); }
+      function saveRevenueLog() {
+        return queueSave(async function () {
+          try { await trackSync(window.storage.set('revenueLog', JSON.stringify(state.revenueLog), false)); } catch (e) { toast("Couldn't save — try again"); }
+        });
       }
 
       function rememberName(list, name) {
@@ -2334,18 +2356,45 @@
       }
 
       /* ---------------- profit ---------------- */
+      function niceCeil(v) {
+        if (v <= 0) return 1;
+        var exp = Math.floor(Math.log10(v));
+        var base = Math.pow(10, exp);
+        var f = v / base;
+        var niceF = f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10;
+        return niceF * base;
+      }
+      function formatAxisValue(n) {
+        n = Math.round(n);
+        if (Math.abs(n) >= 1000) {
+          var v = Math.round((n / 1000) * 10) / 10;
+          return '₹' + v + 'k';
+        }
+        return '₹' + n;
+      }
       function buildChartSvg(curVals, prevVals, curColor) {
-        var w = 320, h = 170, padBottom = 22, padTop = 10;
+        var w = 320, h = 176, padBottom = 22, padTop = 12, padLeft = 40;
+        var plotW = w - padLeft;
+        var plotH = h - padBottom - padTop;
         var maxVal = Math.max(1, Math.max.apply(null, curVals.concat(prevVals).map(Math.abs)));
-        var groupW = w / 7;
-        var barW = 11;
+        var niceMax = niceCeil(maxVal);
+        var groupW = plotW / 7;
+        var barW = 10;
         var color = curColor || 'var(--teal)';
+        var baseY = padTop + plotH;
         var svg = '<svg viewBox="0 0 ' + w + ' ' + h + '" style="width:100%; height:auto; display:block;">';
+
+        [0, 0.5, 1].forEach(function (frac) {
+          var y = padTop + plotH * (1 - frac);
+          var val = niceMax * frac;
+          svg += '<line x1="' + padLeft + '" y1="' + y + '" x2="' + w + '" y2="' + y + '" stroke="var(--line)" stroke-width="1"></line>';
+          svg += '<text x="' + (padLeft - 6) + '" y="' + (y + 3) + '" text-anchor="end" font-size="9" fill="var(--ink-faint)" font-family="\'IBM Plex Mono\',monospace">' + formatAxisValue(val) + '</text>';
+        });
+
         for (var i = 0; i < 7; i++) {
-          var gx = i * groupW + groupW / 2;
-          var curH = Math.round((curVals[i] / maxVal) * (h - padBottom - padTop));
-          var prevH = Math.round((prevVals[i] / maxVal) * (h - padBottom - padTop));
-          var baseY = h - padBottom;
+          var gx = padLeft + i * groupW + groupW / 2;
+          var curH = Math.round((curVals[i] / niceMax) * plotH);
+          var prevH = Math.round((prevVals[i] / niceMax) * plotH);
           svg += '<rect x="' + (gx - barW - 2) + '" y="' + (baseY - prevH) + '" width="' + barW + '" height="' + Math.max(prevH, 1) + '" rx="3" fill="var(--line)" stroke="var(--ink-faint)" stroke-width="0.5"></rect>';
           svg += '<rect x="' + (gx + 2) + '" y="' + (baseY - curH) + '" width="' + barW + '" height="' + Math.max(curH, 1) + '" rx="3" fill="' + color + '"></rect>';
           svg += '<text x="' + gx + '" y="' + (h - 6) + '" text-anchor="middle" font-size="10.5" fill="var(--ink-soft)" font-family="Inter,sans-serif">' + DAY_LABELS[i] + '</text>';
