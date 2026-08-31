@@ -1321,7 +1321,7 @@
     import {
       initializeFirestore,
       persistentLocalCache,
-      persistentSingleTabManager,
+      persistentMultipleTabManager,
       doc,
       collection,
       getDoc,
@@ -1347,7 +1347,7 @@
     // Firestore updates it in the background, instead of always waiting
     // on a full network round trip.
     const db = initializeFirestore(firebaseApp, {
-      localCache: persistentLocalCache({ tabManager: persistentSingleTabManager({}) })
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
     });
     const googleProvider = new GoogleAuthProvider();
 
@@ -1382,20 +1382,31 @@
       });
     }
     function buildFirestoreBackend(uid) {
-      var TIMEOUT_MS = 8000;
+      var READ_TIMEOUT_MS = 20000;
       function ref(key) { return doc(db, 'users', uid, 'appData', key); }
       return {
         get: function (key) {
-          return withTimeout(getDoc(ref(key)), TIMEOUT_MS, "Loading '" + key + "'").then(function (snap) {
-            if (!snap.exists()) return Promise.reject(new Error('not found'));
+          return withTimeout(getDoc(ref(key)), READ_TIMEOUT_MS, "Loading '" + key + "'").then(function (snap) {
+            if (!snap.exists()) {
+              var nf = new Error('not found');
+              nf.inventraNotFound = true;
+              return Promise.reject(nf);
+            }
             return { key: key, value: snap.data().value, shared: false };
           }).catch(function (err) {
-            console.error('Firestore get(' + key + ') failed:', err);
+            if (!err.inventraNotFound) console.error('Firestore get(' + key + ') failed:', err);
             throw err;
           });
         },
+        // Writes are never abandoned client-side: giving up on a slow write
+        // while it's still actually in flight is exactly what caused data
+        // to look like it "vanished" after a refresh — the write eventually
+        // landed, just later than we were willing to wait, and by then the
+        // app had already moved on as if it failed. Firestore's own SDK
+        // (with the persistent cache enabled above) queues writes durably
+        // and retries them on its own, so we let it finish on its own terms.
         set: function (key, value) {
-          return withTimeout(setDoc(ref(key), { value: value, updatedAt: serverTimestamp() }), TIMEOUT_MS, "Saving '" + key + "'").then(function () {
+          return setDoc(ref(key), { value: value, updatedAt: serverTimestamp() }).then(function () {
             return { key: key, value: value, shared: false };
           }).catch(function (err) {
             console.error('Firestore set(' + key + ') failed:', err);
@@ -1403,7 +1414,7 @@
           });
         },
         delete: function (key) {
-          return withTimeout(deleteDoc(ref(key)), TIMEOUT_MS, "Deleting '" + key + "'").then(function () {
+          return deleteDoc(ref(key)).then(function () {
             return { key: key, deleted: true, shared: false };
           }).catch(function (err) {
             console.error('Firestore delete(' + key + ') failed:', err);
@@ -1411,7 +1422,7 @@
           });
         },
         list: function (prefix) {
-          return withTimeout(getDocs(collection(db, 'users', uid, 'appData')), TIMEOUT_MS, 'Listing data').then(function (snap) {
+          return withTimeout(getDocs(collection(db, 'users', uid, 'appData')), READ_TIMEOUT_MS, 'Listing data').then(function (snap) {
             var keys = [];
             snap.forEach(function (d) { if (!prefix || d.id.indexOf(prefix) === 0) keys.push(d.id); });
             return { keys: keys, prefix: prefix, shared: false };
@@ -1816,7 +1827,7 @@
           get: function (key) {
             return new Promise((resolve, reject) => {
               var raw = localStorage.getItem(this._k(key));
-              if (raw === null) { reject(new Error('not found')); return; }
+              if (raw === null) { var nf = new Error('not found'); nf.inventraNotFound = true; reject(nf); return; }
               resolve({ key: key, value: raw, shared: false });
             });
           },
@@ -1936,6 +1947,19 @@
       }
       window.addEventListener('online', function () { lastSyncOk = true; setSyncUI(); });
       window.addEventListener('offline', setSyncUI);
+
+      /* The screen updates instantly on every action, which is great, but it
+         means there's no visible cue that the cloud write is still on its
+         way. Reloading/closing the tab while syncPending > 0 can cancel that
+         in-flight request outright, so warn the browser's own way before
+         that's allowed to happen. */
+      window.addEventListener('beforeunload', function (ev) {
+        if (syncPending > 0) {
+          ev.preventDefault();
+          ev.returnValue = '';
+          return '';
+        }
+      });
 
       /* Writes are fire-and-forget from the UI's perspective (instant screen
          updates), but they must still land in Firestore in the order they
