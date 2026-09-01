@@ -1319,9 +1319,7 @@
     } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js";
 
     import {
-      initializeFirestore,
-      persistentLocalCache,
-      persistentMultipleTabManager,
+      getFirestore,
       doc,
       collection,
       getDoc,
@@ -1342,13 +1340,16 @@
 
     const firebaseApp = initializeApp(firebaseConfig);
     const auth = getAuth(firebaseApp);
-    // Persistent local cache: after the first successful sync, subsequent
-    // loads read from an on-device cache first (near-instant) while
-    // Firestore updates it in the background, instead of always waiting
-    // on a full network round trip.
-    const db = initializeFirestore(firebaseApp, {
-      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
-    });
+    // Deliberately NOT using Firestore's persistent (IndexedDB) local cache
+    // here. It was tried as a speed optimization, but changing its tab-lock
+    // mode between deploys left old cache data in a state that caused loads
+    // to hang indefinitely in a way per-request timeouts couldn't catch,
+    // since the hang was happening in the cache layer itself, underneath
+    // any individual request. Plain in-memory Firestore is slightly slower
+    // on a cold load but far more predictable, and every read still has an
+    // explicit timeout (see withTimeout below) so a bad network fails
+    // loudly and quickly instead of hanging.
+    const db = getFirestore(firebaseApp);
     const googleProvider = new GoogleAuthProvider();
 
     const logoutBtn = document.getElementById('logoutBtn');
