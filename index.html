@@ -1383,7 +1383,14 @@
       });
     }
     function buildFirestoreBackend(uid) {
-      var READ_TIMEOUT_MS = 20000;
+      var READ_TIMEOUT_MS = 10000;
+      // Writes get a longer timeout than reads, on purpose: we'd rather wait
+      // a bit longer than risk treating a write as failed while it's still
+      // actually landing (that's exactly what caused data to look like it
+      // "vanished" earlier). But — unlike when the offline persistence cache
+      // was in place — there is now nothing else backstopping an unbounded
+      // wait, so a timeout here is required, not optional.
+      var WRITE_TIMEOUT_MS = 15000;
       function ref(key) { return doc(db, 'users', uid, 'appData', key); }
       return {
         get: function (key) {
@@ -1399,15 +1406,8 @@
             throw err;
           });
         },
-        // Writes are never abandoned client-side: giving up on a slow write
-        // while it's still actually in flight is exactly what caused data
-        // to look like it "vanished" after a refresh — the write eventually
-        // landed, just later than we were willing to wait, and by then the
-        // app had already moved on as if it failed. Firestore's own SDK
-        // (with the persistent cache enabled above) queues writes durably
-        // and retries them on its own, so we let it finish on its own terms.
         set: function (key, value) {
-          return setDoc(ref(key), { value: value, updatedAt: serverTimestamp() }).then(function () {
+          return withTimeout(setDoc(ref(key), { value: value, updatedAt: serverTimestamp() }), WRITE_TIMEOUT_MS, "Saving '" + key + "'").then(function () {
             return { key: key, value: value, shared: false };
           }).catch(function (err) {
             console.error('Firestore set(' + key + ') failed:', err);
@@ -1415,7 +1415,7 @@
           });
         },
         delete: function (key) {
-          return deleteDoc(ref(key)).then(function () {
+          return withTimeout(deleteDoc(ref(key)), WRITE_TIMEOUT_MS, "Deleting '" + key + "'").then(function () {
             return { key: key, deleted: true, shared: false };
           }).catch(function (err) {
             console.error('Firestore delete(' + key + ') failed:', err);
@@ -1923,6 +1923,7 @@
       /* ---------------- storage ---------------- */
       /* ---------------- sync status badge ---------------- */
       var syncPending = 0;
+      var syncPendingSince = null;
       var lastSyncOk = true;
       var syncDotEl = document.getElementById('syncDot');
       var syncTextEl = document.getElementById('syncText');
@@ -1940,12 +1941,29 @@
         }
       }
       function trackSync(promise) {
+        if (syncPending === 0) syncPendingSince = Date.now();
         syncPending++; setSyncUI();
+        function settle(ok) {
+          syncPending = Math.max(0, syncPending - 1);
+          if (syncPending === 0) syncPendingSince = null;
+          lastSyncOk = ok;
+          setSyncUI();
+        }
         return promise.then(
-          function (v) { lastSyncOk = true; syncPending--; setSyncUI(); return v; },
-          function (e) { lastSyncOk = false; syncPending--; setSyncUI(); throw e; }
+          function (v) { settle(true); return v; },
+          function (e) { settle(false); throw e; }
         );
       }
+      // Safety net: the badge should never be able to show "Syncing…" forever,
+      // no matter what goes wrong underneath. If it's been stuck for more than
+      // 20 seconds straight, force it back to a resolved state so the UI never
+      // lies about what's happening, even if the true cause is still unknown.
+      setInterval(function () {
+        if (syncPending > 0 && syncPendingSince && (Date.now() - syncPendingSince) > 20000) {
+          console.warn('Inventra: sync badge was stuck for 20s+, forcing it to Offline. This usually means requests to Firestore are not completing at all — check the Network tab, or try a different connection (no VPN, no extensions).');
+          syncPending = 0; syncPendingSince = null; lastSyncOk = false; setSyncUI();
+        }
+      }, 3000);
       window.addEventListener('online', function () { lastSyncOk = true; setSyncUI(); });
       window.addEventListener('offline', setSyncUI);
 
@@ -1993,12 +2011,16 @@
         }
         state.loaded = true;
       }
+      function saveFailToast(e) {
+        var reason = (e && e.message) ? e.message.replace(/^Firebase:\s*/, '').slice(0, 80) : 'unknown error';
+        toast("Couldn't save (" + reason + ")");
+      }
       function saveProducts() {
         return queueSave(async function () {
           try {
             await trackSync(window.storage.set('products', JSON.stringify(state.products), false));
             await trackSync(window.storage.set('productNames', JSON.stringify(state.productNames), false));
-          } catch (e) { toast("Couldn't save — try again"); }
+          } catch (e) { saveFailToast(e); }
         });
       }
       function saveCustomers() {
@@ -2006,17 +2028,17 @@
           try {
             await trackSync(window.storage.set('customers', JSON.stringify(state.customers), false));
             await trackSync(window.storage.set('customerNames', JSON.stringify(state.customerNames), false));
-          } catch (e) { toast("Couldn't save — try again"); }
+          } catch (e) { saveFailToast(e); }
         });
       }
       function saveSalesLog() {
         return queueSave(async function () {
-          try { await trackSync(window.storage.set('salesLog', JSON.stringify(state.salesLog), false)); } catch (e) { toast("Couldn't save — try again"); }
+          try { await trackSync(window.storage.set('salesLog', JSON.stringify(state.salesLog), false)); } catch (e) { saveFailToast(e); }
         });
       }
       function saveRevenueLog() {
         return queueSave(async function () {
-          try { await trackSync(window.storage.set('revenueLog', JSON.stringify(state.revenueLog), false)); } catch (e) { toast("Couldn't save — try again"); }
+          try { await trackSync(window.storage.set('revenueLog', JSON.stringify(state.revenueLog), false)); } catch (e) { saveFailToast(e); }
         });
       }
 
